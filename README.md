@@ -7,17 +7,31 @@ A minimal Tauri-based Linux desktop wrapper for [chat.openai.com](https://chat.o
 ## Requirements
 
 - Rust toolchain (stable) and `cargo`
-- Tauri CLI (`cargo install tauri-cli`)
+- Tauri CLI (`cargo install tauri-cli --version "^2.0.0" --locked`)
 - Linux desktop dependencies (Debian/Ubuntu example):
-  ```bash
-  sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev \
+    ```bash
+    # Debian/Ubuntu
+    sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev \
        libayatana-appindicator3-dev librsvg2-dev
-  ```
+
+    # Archlinux
+    sudo pacman -S --needed \
+      webkit2gtk-4.1 \
+      base-devel \
+      curl \
+      wget \
+      file \
+      openssl \
+      appmenu-gtk-module \
+      libappindicator-gtk3 \
+      librsvg \
+      xdotool
+    ```
 
 ## Development
 
 ```bash
-cargo tauri dev --manifest-path src-tauri/Cargo.toml
+cargo tauri dev
 ```
 
 Session/config data lives in:
@@ -40,7 +54,7 @@ The script simply builds the optimized Tauri binary and installs:
 - `~/.local/share/applications/chatgpt-wrapper.desktop`
 - `~/.local/share/icons/hicolor/128x128/apps/chatgpt-wrapper.png`
 
-After it completes, launch **ChatGPT Desktop** from your application menu or via the launcher path.
+No AppImage or linuxdeploy download is required, so it works fully offline. After it completes, launch **ChatGPT Desktop** from your application menu or via the launcher path.
 
 ## Uninstall
 
