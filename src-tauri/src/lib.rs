@@ -8,119 +8,18 @@ use tauri::{
     image::Image,
     menu::{MenuBuilder, MenuItem},
     tray::{TrayIcon, TrayIconBuilder},
-    App, AppHandle, Manager, Theme, WebviewUrl, WebviewWindowBuilder,
+    App, AppHandle, Manager, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use url::Url;
+
+const CHATGPT_URL: &str = "https://chat.openai.com";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             if app.get_webview_window("main").is_none() {
-                let mut config = load_app_config(app);
-                let hide_from_env =
-                    std::env::var("CHATGPT_TAURI_HIDE_DECORATIONS")
-                        .ok()
-                        .map(|value| {
-                            matches!(
-                                value.trim().to_ascii_lowercase().as_str(),
-                                "1" | "true" | "yes"
-                            )
-                        });
-
-                let hide_decorations = hide_from_env.unwrap_or(config.hide_decorations);
-                config.hide_decorations = hide_decorations;
-
-                let config_state = Arc::new(Mutex::new(config));
-                persist_decoration_pref(app.handle(), &config_state, hide_decorations);
-
-                let decorations = Arc::new(Mutex::new(!hide_decorations));
-
-                let webview_cache_dir = app
-                    .path()
-                    .app_data_dir()
-                    .ok()
-                    .map(|dir| dir.join("webview-cache"));
-                if let Some(dir) = &webview_cache_dir {
-                    let _ = fs::create_dir_all(dir);
-                }
-
-                let mut webview_builder = WebviewWindowBuilder::new(
-                    app,
-                    "main",
-                    WebviewUrl::External("https://chat.openai.com".parse().expect("invalid URL")),
-                )
-                .title("ChatGPT Desktop")
-                .theme(Some(Theme::Dark))
-                .inner_size(1200.0, 800.0)
-                .visible(true)
-                .on_new_window(|url, _features| {
-                    if is_allowed_url(&url) {
-                        tauri::webview::NewWindowResponse::Allow
-                    } else {
-                        let _ = open_in_browser(url.as_str());
-                        tauri::webview::NewWindowResponse::Deny
-                    }
-                });
-
-                if let Some(dir) = webview_cache_dir {
-                    webview_builder = webview_builder.data_directory(dir);
-                }
-
-                let main_window = webview_builder.build()?;
-
-                if hide_decorations {
-                    let _ = main_window.set_decorations(false);
-                }
-
-                let toggle_item = MenuItem::with_id(
-                    app,
-                    "toggle-window-chrome",
-                    "Toggle window chrome",
-                    true,
-                    Some("CmdOrCtrl+Shift+B"),
-                )?;
-                let quit_item =
-                    MenuItem::with_id(app, "quit-app", "Quit ChatGPT", true, None::<&str>)?;
-
-                let toggle_id = toggle_item.id().clone();
-                let quit_id = quit_item.id().clone();
-
-                let menu = MenuBuilder::new(app)
-                    .item(&toggle_item)
-                    .item(&quit_item)
-                    .build()?;
-
-                let mut tray_builder = TrayIconBuilder::new()
-                    .tooltip("ChatGPT Desktop")
-                    .menu(&menu)
-                    .on_menu_event({
-                        let decorations = Arc::clone(&decorations);
-                        let config_state = Arc::clone(&config_state);
-                        let toggle_id = toggle_id.clone();
-                        let quit_id = quit_id.clone();
-                        move |handle: &AppHandle<_>, event| {
-                            let event_id = event.id();
-                            if event_id == &toggle_id {
-                                if let Some(visible) =
-                                    toggle_window_decorations(handle, &decorations)
-                                {
-                                    persist_decoration_pref(handle, &config_state, !visible);
-                                }
-                            } else if event_id == &quit_id {
-                                handle.exit(0);
-                            }
-                        }
-                    });
-
-                if let Some(icon) = select_tray_icon(app) {
-                    tray_builder = tray_builder.icon(icon);
-                }
-
-                let tray_state = TrayState::new(tray_builder.build(app)?);
-
-                // keep tray icon alive for the lifetime of the app
-                app.manage(tray_state);
+                initialize_application(app)?;
             }
             Ok(())
         })
@@ -128,6 +27,147 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+/// Prepares configuration, window, and tray so the app feels desktop-native.
+fn initialize_application<R: tauri::Runtime>(app: &App<R>) -> tauri::Result<()> {
+    let (config_state, hide_decorations) = load_initial_preferences(app);
+    persist_decoration_pref(app.handle(), &config_state, hide_decorations);
+
+    let (decorations, _window) = init_main_window(app, hide_decorations)?;
+    let tray_state = build_tray(app, &decorations, &config_state)?;
+
+    // keep tray icon alive for the lifetime of the app
+    app.manage(tray_state);
+    Ok(())
+}
+
+/// Loads persisted preferences, allowing an environment variable to override them.
+fn load_initial_preferences<R: tauri::Runtime>(app: &App<R>) -> (Arc<Mutex<AppConfig>>, bool) {
+    let mut config = load_app_config(app);
+    if let Some(env_override) = decoration_pref_from_env() {
+        config.hide_decorations = env_override;
+    }
+
+    let hide_decorations = config.hide_decorations;
+    (Arc::new(Mutex::new(config)), hide_decorations)
+}
+
+/// Parses the decoration override from `CHATGPT_TAURI_HIDE_DECORATIONS`.
+fn decoration_pref_from_env() -> Option<bool> {
+    std::env::var("CHATGPT_TAURI_HIDE_DECORATIONS")
+        .ok()
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+}
+
+/// Creates the main webview window and applies the decoration state.
+fn init_main_window<R: tauri::Runtime>(
+    app: &App<R>,
+    hide_decorations: bool,
+) -> tauri::Result<(Arc<Mutex<bool>>, WebviewWindow<R>)> {
+    let decorations = Arc::new(Mutex::new(!hide_decorations));
+    let cache_dir = prepare_webview_cache(app);
+
+    let mut webview_builder = WebviewWindowBuilder::new(
+        app,
+        "main",
+        WebviewUrl::External(
+            CHATGPT_URL
+                .parse()
+                .expect("the chatgpt url constant should always be valid"),
+        ),
+    )
+    .title("ChatGPT Desktop")
+    .theme(Some(Theme::Dark))
+    .inner_size(1200.0, 800.0)
+    .visible(true)
+    .on_new_window(|url, _features| {
+        if is_allowed_url(&url) {
+            tauri::webview::NewWindowResponse::Allow
+        } else {
+            let _ = open_in_browser(url.as_str());
+            tauri::webview::NewWindowResponse::Deny
+        }
+    });
+
+    if let Some(dir) = cache_dir {
+        webview_builder = webview_builder.data_directory(dir);
+    }
+
+    let window = webview_builder.build()?;
+    if hide_decorations {
+        let _ = window.set_decorations(false);
+    }
+
+    Ok((decorations, window))
+}
+
+/// Ensures the webview cache directory exists and reports its path.
+fn prepare_webview_cache<R: tauri::Runtime>(app: &App<R>) -> Option<PathBuf> {
+    app.path().app_data_dir().ok().and_then(|dir| {
+        let cache_dir = dir.join("webview-cache");
+        match fs::create_dir_all(&cache_dir) {
+            Ok(_) => Some(cache_dir),
+            Err(err) => {
+                eprintln!("Failed to create webview cache directory: {err}");
+                None
+            }
+        }
+    })
+}
+
+/// Builds the system tray so the user can toggle window chrome or exit quickly.
+fn build_tray<R: tauri::Runtime>(
+    app: &App<R>,
+    decorations: &Arc<Mutex<bool>>,
+    config_state: &Arc<Mutex<AppConfig>>,
+) -> tauri::Result<TrayState<R>> {
+    let toggle_item = MenuItem::with_id(
+        app,
+        "toggle-window-chrome",
+        "Toggle window chrome",
+        true,
+        Some("CmdOrCtrl+Shift+B"),
+    )?;
+    let quit_item = MenuItem::with_id(app, "quit-app", "Quit ChatGPT", true, None::<&str>)?;
+
+    let toggle_id = toggle_item.id().clone();
+    let quit_id = quit_item.id().clone();
+
+    let menu = MenuBuilder::new(app)
+        .item(&toggle_item)
+        .item(&quit_item)
+        .build()?;
+
+    let mut tray_builder = TrayIconBuilder::new()
+        .tooltip("ChatGPT Desktop")
+        .menu(&menu)
+        .on_menu_event({
+            let decorations = Arc::clone(decorations);
+            let config_state = Arc::clone(config_state);
+            move |handle: &AppHandle<_>, event| {
+                let event_id = event.id();
+                if event_id == &toggle_id {
+                    if let Some(visible) = toggle_window_decorations(handle, &decorations) {
+                        persist_decoration_pref(handle, &config_state, !visible);
+                    }
+                } else if event_id == &quit_id {
+                    handle.exit(0);
+                }
+            }
+        });
+
+    if let Some(icon) = select_tray_icon(app) {
+        tray_builder = tray_builder.icon(icon);
+    }
+
+    Ok(TrayState::new(tray_builder.build(app)?))
+}
+
+/// Toggles Tauri window decorations on the main thread and reports the new value.
 fn toggle_window_decorations<R: tauri::Runtime>(
     handle: &AppHandle<R>,
     decorations: &Arc<Mutex<bool>>,
@@ -164,6 +204,7 @@ fn toggle_window_decorations<R: tauri::Runtime>(
     rx.recv().ok().flatten()
 }
 
+/// Keeps the tray icon alive for the lifetime of the app.
 struct TrayState<R: tauri::Runtime>(TrayIcon<R>);
 
 impl<R: tauri::Runtime> TrayState<R> {
@@ -172,6 +213,7 @@ impl<R: tauri::Runtime> TrayState<R> {
     }
 }
 
+/// Picks the embedded icon, falling back to the default window icon when present.
 fn select_tray_icon<R: tauri::Runtime>(app: &App<R>) -> Option<Image<'static>> {
     if let Some(icon) = app
         .default_window_icon()
@@ -183,6 +225,7 @@ fn select_tray_icon<R: tauri::Runtime>(app: &App<R>) -> Option<Image<'static>> {
     Image::from_bytes(include_bytes!("../icons/32x32.png")).ok()
 }
 
+/// Restricts new webview windows to known ChatGPT hosts, otherwise opens in the browser.
 fn is_allowed_url(url: &Url) -> bool {
     match url.scheme() {
         "https" | "http" => match url.host_str() {
@@ -196,6 +239,7 @@ fn is_allowed_url(url: &Url) -> bool {
     }
 }
 
+/// Captures user preferences persisted on disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct AppConfig {
     #[serde(default)]
@@ -223,6 +267,7 @@ fn load_app_config<R: tauri::Runtime>(app: &App<R>) -> AppConfig {
     AppConfig::default()
 }
 
+/// Persists the latest decoration preference and reports failures to stderr.
 fn persist_decoration_pref<R: tauri::Runtime>(
     handle: &AppHandle<R>,
     config_state: &Arc<Mutex<AppConfig>>,
