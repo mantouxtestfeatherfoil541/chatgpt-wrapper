@@ -3,11 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::sync::{mpsc, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 use tauri::{
-    image::Image,
-    menu::{MenuBuilder, MenuItem},
-    tray::{TrayIcon, TrayIconBuilder},
     App, AppHandle, Manager, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
 };
 use url::Url;
@@ -27,16 +24,12 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-/// Prepares configuration, window, and tray so the app feels desktop-native.
+/// Prepares configuration and window so the app feels desktop-native.
 fn initialize_application<R: tauri::Runtime>(app: &App<R>) -> tauri::Result<()> {
     let (config_state, hide_decorations) = load_initial_preferences(app);
     persist_decoration_pref(app.handle(), &config_state, hide_decorations);
 
-    let (decorations, _window) = init_main_window(app, hide_decorations)?;
-    let tray_state = build_tray(app, &decorations, &config_state)?;
-
-    // keep tray icon alive for the lifetime of the app
-    app.manage(tray_state);
+    let (_decorations, _window) = init_main_window(app, hide_decorations)?;
     Ok(())
 }
 
@@ -117,112 +110,6 @@ fn prepare_webview_cache<R: tauri::Runtime>(app: &App<R>) -> Option<PathBuf> {
             }
         }
     })
-}
-
-/// Builds the system tray so the user can toggle window chrome or exit quickly.
-fn build_tray<R: tauri::Runtime>(
-    app: &App<R>,
-    decorations: &Arc<Mutex<bool>>,
-    config_state: &Arc<Mutex<AppConfig>>,
-) -> tauri::Result<TrayState<R>> {
-    let toggle_item = MenuItem::with_id(
-        app,
-        "toggle-window-chrome",
-        "Toggle window chrome",
-        true,
-        Some("CmdOrCtrl+Shift+B"),
-    )?;
-    let quit_item = MenuItem::with_id(app, "quit-app", "Quit ChatGPT", true, None::<&str>)?;
-
-    let toggle_id = toggle_item.id().clone();
-    let quit_id = quit_item.id().clone();
-
-    let menu = MenuBuilder::new(app)
-        .item(&toggle_item)
-        .item(&quit_item)
-        .build()?;
-
-    let mut tray_builder = TrayIconBuilder::new()
-        .tooltip("ChatGPT Desktop")
-        .menu(&menu)
-        .on_menu_event({
-            let decorations = Arc::clone(decorations);
-            let config_state = Arc::clone(config_state);
-            move |handle: &AppHandle<_>, event| {
-                let event_id = event.id();
-                if event_id == &toggle_id {
-                    if let Some(visible) = toggle_window_decorations(handle, &decorations) {
-                        persist_decoration_pref(handle, &config_state, !visible);
-                    }
-                } else if event_id == &quit_id {
-                    handle.exit(0);
-                }
-            }
-        });
-
-    if let Some(icon) = select_tray_icon(app) {
-        tray_builder = tray_builder.icon(icon);
-    }
-
-    Ok(TrayState::new(tray_builder.build(app)?))
-}
-
-/// Toggles Tauri window decorations on the main thread and reports the new value.
-fn toggle_window_decorations<R: tauri::Runtime>(
-    handle: &AppHandle<R>,
-    decorations: &Arc<Mutex<bool>>,
-) -> Option<bool> {
-    let (tx, rx) = mpsc::channel();
-    let handle_clone = handle.clone();
-    let decorations_clone = Arc::clone(decorations);
-
-    let result = handle.run_on_main_thread(move || {
-        let result = if let Some(window) = handle_clone.get_webview_window("main") {
-            if let Ok(mut current) = decorations_clone.lock() {
-                let new_state = !*current;
-                match window.set_decorations(new_state) {
-                    Ok(_) => {
-                        *current = new_state;
-                        Some(new_state)
-                    }
-                    Err(_) => None,
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let _ = tx.send(result);
-    });
-
-    if result.is_err() {
-        return None;
-    }
-
-    rx.recv().ok().flatten()
-}
-
-/// Keeps the tray icon alive for the lifetime of the app.
-struct TrayState<R: tauri::Runtime>(TrayIcon<R>);
-
-impl<R: tauri::Runtime> TrayState<R> {
-    fn new(icon: TrayIcon<R>) -> Self {
-        Self(icon)
-    }
-}
-
-/// Picks the embedded icon, falling back to the default window icon when present.
-fn select_tray_icon<R: tauri::Runtime>(app: &App<R>) -> Option<Image<'static>> {
-    if let Some(icon) = app
-        .default_window_icon()
-        .map(|icon| icon.clone().to_owned())
-    {
-        return Some(icon);
-    }
-
-    Image::from_bytes(include_bytes!("../icons/32x32.png")).ok()
 }
 
 /// Restricts new webview windows to known ChatGPT hosts, otherwise opens in the browser.
