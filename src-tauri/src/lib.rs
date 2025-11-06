@@ -5,14 +5,31 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{
-    App, AppHandle, Manager, Theme, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    webview::DownloadEvent, App, AppHandle, Manager, Theme, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder,
 };
+use tauri_plugin_notification::NotificationExt;
 use url::Url;
 
 const CHATGPT_URL: &str = "https://chatgpt.com";
 
 const INIT_SCRIPT: &str = r#"
 (function() {
+    // Performance: Preconnect to CDN domains
+    const preconnectDomains = [
+        'https://cdn.oaistatic.com',
+        'https://cdn.openai.com'
+    ];
+    
+    preconnectDomains.forEach(domain => {
+        const link = document.createElement('link');
+        link.rel = 'preconnect';
+        link.href = domain;
+        link.crossOrigin = 'anonymous';
+        document.head?.appendChild(link);
+    });
+
+    // Font smoothing
     const style = document.createElement('style');
     style.textContent = `
         * {
@@ -28,6 +45,12 @@ const INIT_SCRIPT: &str = r#"
         });
     }
 
+    // Auto-grant notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    // Reload handler
     document.addEventListener('keydown', function(e) {
         if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key === 'r')) {
             e.preventDefault();
@@ -35,7 +58,7 @@ const INIT_SCRIPT: &str = r#"
         }
     }, true);
 
-
+    // External link handler
     document.addEventListener('click', function(e) {
         const link = e.target.closest('a');
         if (!link) return;
@@ -83,6 +106,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![reload_webview])
         .setup(|app| {
             if app.get_webview_window("main").is_none() {
@@ -126,6 +150,73 @@ fn decoration_pref_from_env() -> Option<bool> {
         })
 }
 
+/// Handles download events: saves to Downloads folder and notifies user.
+fn create_download_handler<R: tauri::Runtime>(
+    app_handle: AppHandle<R>,
+) -> impl Fn(tauri::Webview<R>, DownloadEvent) -> bool {
+    let download_path = Arc::new(Mutex::new(Option::<PathBuf>::None));
+    
+    move |_webview, event| {
+        match event {
+            DownloadEvent::Requested { destination, .. } => {
+                // Get downloads directory
+                let download_dir = match app_handle.path().download_dir() {
+                    Ok(dir) => dir,
+                    Err(_) => return false,
+                };
+                
+                // Set destination to downloads folder
+                let final_path = download_dir.join(&destination);
+                let mut locked_path = download_path.lock().unwrap();
+                *locked_path = Some(final_path.clone());
+                *destination = final_path;
+                
+                // Show notification
+                let app = app_handle.clone();
+                let filename = destination.file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("file")
+                    .to_string();
+                
+                tauri::async_runtime::spawn(async move {
+                    let _ = app.notification()
+                        .builder()
+                        .title("Downloading file")
+                        .body(&format!("Saving: {}", filename))
+                        .show();
+                });
+                
+                return true;
+            }
+            DownloadEvent::Finished { success, .. } => {
+                let path_opt = download_path.lock().unwrap().clone();
+                
+                if let Some(final_path) = path_opt {
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if success {
+                            let _ = app.notification()
+                                .builder()
+                                .title("Download completed")
+                                .body(&format!("Saved to: {}", final_path.display()))
+                                .show();
+                        } else {
+                            let _ = app.notification()
+                                .builder()
+                                .title("Download failed")
+                                .body("Could not complete the download")
+                                .show();
+                        }
+                    });
+                }
+                return true;
+            }
+            _ => {}
+        }
+        true
+    }
+}
+
 /// Creates the main webview window and applies the decoration state.
 fn init_main_window<R: tauri::Runtime>(
     app: &App<R>,
@@ -148,11 +239,16 @@ fn init_main_window<R: tauri::Runtime>(
     .inner_size(1200.0, 800.0)
     .min_inner_size(400.0, 300.0)
     .visible(true)
-    .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    .user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
     .accept_first_mouse(true)
     .initialization_script(INIT_SCRIPT)
-    .additional_browser_args("--enable-features=WebRTCPipeWireCapturer")
+    .additional_browser_args("--enable-features=WebRTCPipeWireCapturer,VaapiVideoDecodeLinuxGL --enable-gpu-rasterization --enable-zero-copy --disable-software-rasterizer --enable-accelerated-video-decode")
+    .on_download(create_download_handler(app.handle().clone()))
     .on_new_window(|url, _features| {
+        if url.scheme() == "blob" || url.scheme() == "data" {
+            return tauri::webview::NewWindowResponse::Deny;
+        }
+        
         if is_allowed_url(&url) {
             tauri::webview::NewWindowResponse::Allow
         } else {
