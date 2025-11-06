@@ -31,7 +31,8 @@
       "icons/icon-light.png"
     ],
     "resources": [
-      "icons/icon-light-32x32.png"
+      "icons/icon-light-32x32.png",
+      "icons/32x32.png"
     ]
   }
 }
