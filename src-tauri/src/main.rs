@@ -1,3 +1,3 @@
 fn main() {
-    chatgpt_wrapper_lib::run();
+    chatgpt_desktop_lib::run();
 }

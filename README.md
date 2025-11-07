@@ -35,8 +35,8 @@ cargo tauri dev
 ```
 
 Session/config data lives in:
-- `~/.config/dev.iperez.chatgpt-wrapper/settings.json` (preferences)
-- `~/.local/share/dev.iperez.chatgpt-wrapper/webview-cache` (session storage)
+- `~/.config/dev.iperez.chatgpt-desktop/settings.json` (preferences)
+- `~/.local/share/dev.iperez.chatgpt-desktop/webview-cache` (session storage)
 
 Remove those folders to reset the app.
 
@@ -49,11 +49,11 @@ To install ChatGPT Desktop under `~/.local`, run:
 ```
 
 The script simply builds the optimized Tauri binary and installs:
-- `~/.local/opt/chatgpt-wrapper/chatgpt-wrapper` (release binary)
-- `~/.local/opt/chatgpt-wrapper/chatgpt-desktop` (launcher script)
-- `~/.local/opt/chatgpt-wrapper/icons/` (runtime icons for tray)
-- `~/.local/share/applications/chatgpt-wrapper.desktop`
-- `~/.local/share/icons/hicolor/*/apps/chatgpt-wrapper*.png` (system icons in multiple sizes)
+- `~/.local/opt/chatgpt-desktop/chatgpt-desktop` (release binary)
+- `~/.local/opt/chatgpt-desktop/chatgpt-desktop` (launcher script)
+- `~/.local/opt/chatgpt-desktop/icons/` (runtime icons for tray)
+- `~/.local/share/applications/chatgpt-desktop.desktop`
+- `~/.local/share/icons/hicolor/*/apps/chatgpt-desktop*.png` (system icons in multiple sizes)
 
 No AppImage or linuxdeploy download is required, so it works fully offline. After it completes, launch **ChatGPT Desktop** from your application menu or via the launcher path.
 
@@ -61,14 +61,14 @@ No AppImage or linuxdeploy download is required, so it works fully offline. Afte
 
 ```bash
 # Remove application files
-rm -f ~/.local/share/applications/chatgpt-wrapper.desktop
-rm -rf ~/.local/opt/chatgpt-wrapper
+rm -f ~/.local/share/applications/chatgpt-desktop.desktop
+rm -rf ~/.local/opt/chatgpt-desktop
 
 # Remove icons
-rm -f ~/.local/share/icons/hicolor/32x32/apps/chatgpt-wrapper.png
-rm -f ~/.local/share/icons/hicolor/32x32/apps/chatgpt-wrapper-tray-light.png
-rm -f ~/.local/share/icons/hicolor/128x128/apps/chatgpt-wrapper.png
-rm -f ~/.local/share/icons/hicolor/256x256/apps/chatgpt-wrapper.png
+rm -f ~/.local/share/icons/hicolor/32x32/apps/chatgpt-desktop.png
+rm -f ~/.local/share/icons/hicolor/32x32/apps/chatgpt-desktop-tray-light.png
+rm -f ~/.local/share/icons/hicolor/128x128/apps/chatgpt-desktop.png
+rm -f ~/.local/share/icons/hicolor/256x256/apps/chatgpt-desktop.png
 
 # Update databases
 update-desktop-database ~/.local/share/applications
@@ -77,13 +77,13 @@ gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor
 
 Optionally delete the config/cache folders:
 ```bash
-rm -rf ~/.config/dev.iperez.chatgpt-wrapper
-rm -rf ~/.cache/dev.iperez.chatgpt-wrapper
+rm -rf ~/.config/dev.iperez.chatgpt-desktop
+rm -rf ~/.cache/dev.iperez.chatgpt-desktop
 ```
 
 ## Settings
 
-You can edit the settings file located at `~/.config/dev.iperez.chatgpt-wrapper/settings.json`.
+You can edit the settings file located at `~/.config/dev.iperez.chatgpt-desktop/settings.json`.
 
 ### Available Options
 

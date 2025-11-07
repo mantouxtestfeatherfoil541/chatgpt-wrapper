@@ -2,7 +2,7 @@
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "ChatGPT Desktop",
   "version": "0.1.0",
-  "identifier": "chatgpt-wrapper",
+  "identifier": "chatgpt-desktop",
   "build": {
     "frontendDist": "../src"
   },
